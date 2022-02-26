@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>amos_homework5</title>
+	<link rel="shortcut icon" href="#"/>
+    <script src="https://unpkg.com/vue@next"></script>
+    <script src="https://unpkg.com/vee-validate@next"></script>
+    <script src="https://unpkg.com/@vee-validate/i18n@4.1.0"></script>
+    <script src="https://unpkg.com/@vee-validate/rules"></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.9.1/axios.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.9.0/css/all.min.css' />
+    <script src="./javascript/products_front.js" type="module"></script>
+    <link rel="shortcut icon" href="#" />
+  </head>
+
+  <body>
+    <div id="app">
+      <div class="container">
+        <div class="row py-3">
+          <!-- #region 產品列表 -->
+          <div class="col-md-6">
+		    <div>             
+			   <button type="button" class="btn btn-outline-info" onclick="location.href='index_admin.html'" >後台商品管理
+            </div>
+            <div>
+              <h3 class="my-2 text-primary">前台產品列表</h3>
+            </div>
+             <front-product-modal-name ref="refCarProductModal" :productinner="tempProductReview" @add-to-cart="addItemToCart"></front-product-modal-name>
+            <table class="table table-hover my-2">
+              <thead>
+                <tr>
+                  <th width="120" class="my-2 text-primary">分類</th>
+                  <th width="120" class="my-2 text-primary">產品名稱</th>
+                  <th width="70" class="my-2 text-primary">原價</th>
+                  <th width="70" class="my-2 text-primary">售價</th>
+                  <th>檢視/加入購物車</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item) in products" :key="item.id">
+                  <td>{{ item.category }}</td>
+                  <td>{{ item.title }}</td>
+                  <td>{{item.origin_price}}</td>
+                  <td>{{item.price}}</td>
+				  <td>
+                  <div class="btn-group-vertical btn-group-sm">
+                    <button type="button" class="btn btn-outline-info" @click="getProduct(item.id)"
+                      :disabled="loadingStatus.loadingItem === item.id || !item.is_enabled">
+                      <i class="fas fa-spinner fa-pulse" v-if="loadingStatus.loadingItem === item.id"></i>
+                      檢視商品
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" @click="addItemToCart(item.id)"
+                      :disabled="loadingStatus.loadingItem === item.id || !item.is_enabled">
+                      <i class="fas fa-spinner fa-pulse" v-if="loadingStatus.loadingItem === item.id"></i>
+                      加入購物車
+                    </button>
+                  </div>
+                </td>                
+                </tr>
+              </tbody>
+            </table>
+            <p class="my-2 text-primary">
+              本頁有<span>{{ products.length }}</span> 項產品 / 總共有<span>{{ totalProducts }}</span> 項產品
+            </p>
+			
+			<pagination-list :pages-data="paginationData" @emit-pages="getData"></pagination-list>
+          </div>
+          <!-- #endregion 產品列表 -->  
+		  <div class="col-md-6">
+			  <!-- 購物車列表 -->
+			  <div>
+				  <h3 class="my-2 text-primary">購物車資訊</h3>
+				</div>
+			  <div class="text-end">
+				<button class="btn btn-outline-danger" type="button" @click="deleteCartDataList">清空購物車</button>
+			  </div>
+			  <!-- 購物車資訊 -->
+				<table class="table align-middle">
+				<thead>
+				  <tr>
+					<th></th>
+					<th>品名</th>
+					<th style="width: 150px">數量/單位</th>
+					<th>單價</th>
+				  </tr>
+				</thead>
+				<tbody>
+				  <template v-if="cart.carts">
+					<tr v-for="item in cart.carts" :key="item.id">
+					  <td>
+						<button type="button" class="btn btn-outline-danger btn-sm" @click="removeCartItem(item.id)"
+						  :disabled="loadingStatus.loadingItem === item.id">
+						  <i class="fas fa-spinner fa-pulse" v-if="loadingStatus.loadingItem === item.id"></i>
+						  x
+						</button>
+					  </td>
+					  <td>
+						{{ item.product.title }}
+						<div class="text-success" v-if="item.coupon">
+						  已套用優惠券
+						</div>
+					  </td>
+					  <td>
+						<div class="input-group input-group-sm">
+						  <div class="input-group mb-3">
+							<input v-model.number="item.qty" @blur="updateCartItem(item)"
+							  :disabled="loadingStatus.loadingItem === item.id" min="1" type="number" class="form-control">
+							<span class="input-group-text" id="basic-addon2">{{ item.product.unit }}</span>
+						  </div>
+						</div>
+					  </td>
+					  <td class="text-end">
+						<small v-if="cart.final_total !== cart.total" class="text-success">折扣價：</small>
+						{{ item.final_total }}
+					  </td>
+					</tr>
+				  </template>
+				</tbody>
+				<tfoot>
+				  <tr>
+					<td colspan="3" class="text-end">總計</td>
+					<td class="text-end">{{ cart.total }}</td>
+				  </tr>
+				  <tr v-if="cart.final_total !== cart.total">
+					<td colspan="3" class="text-end text-success">折扣價</td>
+					<td class="text-end text-success">{{ cart.final_total }}</td>
+				  </tr>
+				</tfoot>
+			  </table>
+			  <!-- 收件人資訊  -->
+				<div class="my-5 row justify-content-center">
+				<div>
+				  <h3 class="my-2 text-primary">收件人資訊</h3>
+				</div>
+				  <v-form ref="form" class="col-md-6" v-slot="{ errors }" @submit="buildOrder">
+					<div class="mb-3">
+					  <label for="email" class="form-label">Email</label>
+					  <v-field id="email" name="email" type="email" class="form-control"
+						:class="{ 'is-invalid': errors['email'] }" placeholder="請輸入 Email" rules="email|required"
+						v-model="form.user.email"></v-field>
+					  <error-message name="email" class="invalid-feedback"></error-message>
+					</div>
+
+					<div class="mb-3">
+					  <label for="name" class="form-label">收件人姓名</label>
+					  <v-field id="name" name="姓名" type="text" class="form-control" :class="{ 'is-invalid': errors['姓名'] }"
+						placeholder="請輸入姓名" rules="required" v-model="form.user.name"></v-field>
+					  <error-message name="姓名" class="invalid-feedback"></error-message>
+					</div>
+
+					<div class="mb-3">
+					  <label for="tel" class="form-label">收件人電話</label>
+					  <v-field id="tel" name="電話" type="text" class="form-control" :class="{ 'is-invalid': errors['電話'] }"
+						placeholder="請輸入電話" rules="required|min:8|max:10" v-model="form.user.tel"></v-field>
+					  <error-message name="電話" class="invalid-feedback"></error-message>
+					</div>
+
+					<div class="mb-3">
+					  <label for="address" class="form-label">收件人地址</label>
+					  <v-field id="address" name="地址" type="text" class="form-control" :class="{ 'is-invalid': errors['地址'] }"
+						placeholder="請輸入地址" rules="required" v-model="form.user.address"></v-field>
+					  <error-message name="地址" class="invalid-feedback"></error-message>
+					</div>
+
+					<div class="mb-3">
+					  <label for="message" class="form-label">留言</label>
+					  <textarea name="" id="message" class="form-control" cols="30" rows="10" v-model="form.message"></textarea>
+					</div>
+					<div class="text-end">
+					  <button type="submit" class="btn btn-danger">送出訂單</button>
+					</div>
+				  </v-form>
+				</div>
+
+			  <!-- -->
+		  </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="text/x-template" id="paginationList">
+      <nav aria-label="Page navigation example">
+        <ul class="pagination">
+          <li
+            class="page-item"
+            :class="{'disabled': pagesData.current_page === 1}"
+          >
+            <a
+              class="page-link"
+              href="#"
+              aria-label="Previous"
+              @click.prevent="emitPages(pagesData.current_page - 1)"
+            >
+              <span aria-hidden="true">&laquo;</span>
+            </a>
+          </li>
+          <li
+            v-for="(item, index) in pagesData.total_pages"
+            :key="index"
+            class="page-item"
+            :class="{'active': item === pagesData.current_page}"
+          >
+            <span
+              class="page-link"
+              v-if="item === pagesData.current_page"
+            >{{ item }}</span>
+            <a
+              class="page-link"
+              href="#"
+              v-else
+              @click.prevent="emitPages(item)"
+            >{{ item }}</a>
+          </li>
+          <li
+            class="page-item"
+            :class="{'disabled': pagesData.current_page === pagesData.total_pages}"
+          >
+            <a
+              class="page-link"
+              href="#"
+              aria-label="Next"
+              @click.prevent="emitPages(pagesData.current_page + 1)"
+            >
+              <span aria-hidden="true">&raquo;</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </script>
+</body>
+</html>
